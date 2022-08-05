@@ -7,10 +7,14 @@ def load_argumets():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tpr_file',
                         type=str,
-                        help='Tpr file from gromacs with metadata')
+                        help='Tpr file from gromacs with metadata.')
     parser.add_argument('--gro_file',
                         type=str,
-                        help='Gro file from gromacs with metadata')
+                        help='Gro file from gromacs with metadata.')
+    parser.add_argument('--cpt_file',
+                        type=str,
+                        help='cpt file from gromacs with metadata.',
+                        default=None)
     args = parser.parse_args()
     return args
 
@@ -22,8 +26,7 @@ def load_tpr_lines(tpr_file: str) -> list:
     return tpr_lines
 
 
-def extract_main_information(tpr_file: str,
-                             gro_file: str) -> dict:
+def extract_main_information(args) -> dict:
     def _list_of_molecules():
         shortcuts = {'ala': 'A',
                      'arg': 'R',
@@ -72,13 +75,13 @@ def extract_main_information(tpr_file: str,
 
     main_information = {"force field": "probably has to be set by the user"}
 
-    os.system(f"gmx dump -s {tpr_file} 2>&1 | grep \"VERSION\" > version_gmx.tmp")
+    os.system(f"gmx dump -s {args.tpr_file} 2>&1 | grep \"VERSION\" > version_gmx.tmp")
     main_information["gromacs version"] = open("version_gmx.tmp", "r").read().splitlines()[0].split()[4]
     os.system("rm version_gmx.tmp")
-    os.system(f"gmx dump -s {tpr_file} 2>&1 > version_gmx.tmp")
+    os.system(f"gmx dump -s {args.tpr_file} 2>&1 > version_gmx.tmp")
     main_information["size and shape of the simulation box"] = [float(n) for n in
-                                                                open(gro_file, "r").readlines()[-1].rstrip().split()]
-    os.system("rm version_gmx.tmp")
+                                                                open(args.gro_file, "r").readlines()[-1].rstrip().split()]
+    # os.system("rm version_gmx.tmp")
 
     integrator = get_value_for_key("integrator")
     if integrator in ["steep", "cg"]:
@@ -86,7 +89,13 @@ def extract_main_information(tpr_file: str,
     elif integrator == "sd" or integrator[:2] == "md":
         main_information["type of simulation"] = "molecular dynamics"
         main_information["simulation time step [ps]"] = get_value_for_key("dt")
-        main_information["simulation length [ps]"] = main_information["simulation time step [ps]"] * get_value_for_key("nsteps")
+        if args.cpt_file is None:
+            main_information["simulation length [ps]"] = main_information["simulation time step [ps]"] * get_value_for_key("nsteps")
+        else:
+            pass
+            os.system(f"gmx check -f {args.cpt_file} 2>&1 | grep \"Last frame\" > frame.tmp")
+            main_information["simulation length [ps]"] = float(open("frame.tmp", "r").read().splitlines()[1].split()[4])
+            os.system("rm frame.tmp")
     tcoupl = get_value_for_key("tcoupl")
     pcoupl = get_value_for_key("pcoupl")
     if tcoupl == pcoupl == "no":
@@ -247,7 +256,7 @@ def add_awh_information():
                           keys=("awh-nbias",))
     store_values_for_keys(target=detailed_information,
                           keys=("awh-potential",
-                                "awh-share-bias-multisim"))
+                                "awh-share-multisim"))
     for awh_i in range(1, published_information["AWH adaptive biasing"]["awh-nbias"] + 1):
         store_values_for_keys(target=published_information["AWH adaptive biasing"],
                               keys=(f"awh{awh_i}-ndim",
@@ -354,7 +363,7 @@ def find_matrix_with_key(key: str) -> list:
 if __name__ == "__main__":
     args = load_argumets()
     tpr_lines = load_tpr_lines(args.tpr_file)
-    main_information, tcoupl, pcoupl = extract_main_information(args.tpr_file, args.gro_file)
+    main_information, tcoupl, pcoupl = extract_main_information(args)
     published_information = extract_published_information(tcoupl, pcoupl)
     detailed_information = extract_detailed_information()
 
