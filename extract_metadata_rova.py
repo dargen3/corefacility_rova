@@ -1,6 +1,7 @@
 import argparse
 import os
 import re
+import datetime
 
 
 def load_argumets():
@@ -81,8 +82,7 @@ def extract_main_information(args) -> dict:
     os.system(f"gmx dump -s {args.tpr_file} 2>&1 > version_gmx.tmp")
     main_information["size and shape of the simulation box"] = [float(n) for n in
                                                                 open(args.gro_file, "r").readlines()[-1].rstrip().split()]
-    # os.system("rm version_gmx.tmp")
-
+    os.system("rm version_gmx.tmp")
     integrator = get_value_for_key("integrator")
     if integrator in ["steep", "cg"]:
         main_information["type of simulation"] = "energy minimization"
@@ -360,6 +360,11 @@ def find_matrix_with_key(key: str) -> list:
     return matrix
 
 
+def add_additional_info():
+    metadata["_version"] = "1.0.0"
+    metadata["_created"] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
 if __name__ == "__main__":
     args = load_argumets()
     tpr_lines = load_tpr_lines(args.tpr_file)
@@ -376,5 +381,5 @@ if __name__ == "__main__":
     metadata = {"main_information": main_information,
                 "published_information": published_information,
                 "detailed_information": detailed_information}
-    from pprint import pprint
-    pprint(metadata)
+
+    add_additional_info()
