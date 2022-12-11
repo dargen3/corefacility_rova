@@ -1,7 +1,9 @@
 import argparse
+import datetime
 import os
 import re
-import datetime
+import yaml
+import pprint
 
 
 def load_argumets():
@@ -16,14 +18,25 @@ def load_argumets():
                         type=str,
                         help='cpt file from gromacs with metadata.',
                         default=None)
+    parser.add_argument('--print_metadata',
+                        type=str,
+                        choices=("json", "yaml"),
+                        default="yaml",
+                        help="Print extracted metadata as json or yaml.")
     args = parser.parse_args()
+
+    if not os.path.isfile(args.tpr_file):
+        exit(f"\nERROR! There is no file {args.tpr_file}!\n")
+    if not os.path.isfile(args.gro_file):
+        exit(f"\nERROR! There is no file {args.gro_file}!\n")
+
     return args
 
 
 def load_tpr_lines(tpr_file: str) -> list:
     os.system(f"gmx dump -s {tpr_file} 1> metadata_gmx.tmp")
     tpr_lines = [line.split() for line in open("metadata_gmx.tmp", "r").read().lower().splitlines()]
-    os.system("rm metadata_gmx.tmp")
+    #os.system("rm metadata_gmx.tmp")
     return tpr_lines
 
 
@@ -62,7 +75,7 @@ def extract_main_information(args) -> dict:
                                                      "count": nmols}
         for x in range(mcounter):
             for index, sl in enumerate(tpr_lines):
-                if bool(re.search("moltype \((\d+)\):", " ".join(sl))) and tpr_lines[index+1] == [f"name=\"{mols_data[f'molecule {x+1}']['name']}\""]:
+                if bool(re.search("moltype \((\d+)\):", " ".join(sl))) and tpr_lines[index + 1] == [f"name=\"{mols_data[f'molecule {x + 1}']['name']}\""]:
                     while not bool(re.search("residue \((\d+)\)", " ".join(tpr_lines[index]))):
                         index += 1
                     index += 1
@@ -71,7 +84,7 @@ def extract_main_information(args) -> dict:
                         residues.append("".join(tpr_lines[index]).split("=")[2][1:-4])
                         index += 1
                     if len(list(set(shortcuts.keys()).intersection(set(residues)))):
-                        mols_data[f"molecule {x+1}"]["residues"] = [shortcuts[res] for res in residues]
+                        mols_data[f"molecule {x + 1}"]["residues"] = [shortcuts[res] for res in residues]
         main_information["molecules"] = mols_data
 
     main_information = {"force field": "probably has to be set by the user"}
@@ -81,7 +94,8 @@ def extract_main_information(args) -> dict:
     os.system("rm version_gmx.tmp")
     os.system(f"gmx dump -s {args.tpr_file} 2>&1 > version_gmx.tmp")
     main_information["size and shape of the simulation box"] = [float(n) for n in
-                                                                open(args.gro_file, "r").readlines()[-1].rstrip().split()]
+                                                                open(args.gro_file, "r").readlines()[
+                                                                    -1].rstrip().split()]
     os.system("rm version_gmx.tmp")
     integrator = get_value_for_key("integrator")
     if integrator in ["steep", "cg"]:
@@ -90,7 +104,8 @@ def extract_main_information(args) -> dict:
         main_information["type of simulation"] = "molecular dynamics"
         main_information["simulation time step [ps]"] = get_value_for_key("dt")
         if args.cpt_file is None:
-            main_information["simulation length [ps]"] = main_information["simulation time step [ps]"] * get_value_for_key("nsteps")
+            main_information["simulation length [ps]"] = main_information[
+                                                             "simulation time step [ps]"] * get_value_for_key("nsteps")
         else:
             pass
             os.system(f"gmx check -f {args.cpt_file} 2>&1 | grep \"Last frame\" > frame.tmp")
@@ -199,8 +214,8 @@ def add_umbrella_sampling_information():
         for index, sl in enumerate(tpr_lines[index:], start=index):
             if bool(re.search("dim \((\d+)\):", " ".join(sl))):
                 dim = []
-                for n in range(1, int(sl[1][1:-2])+1):
-                    dim.append(convert_str_to_int_float("".join(tpr_lines[index+n]).split("=")[1]))
+                for n in range(1, int(sl[1][1:-2]) + 1):
+                    dim.append(convert_str_to_int_float("".join(tpr_lines[index + n]).split("=")[1]))
                 break
         published_information["umbrella sampling"][f"pull-coord{i}-dim"] = dim
 
@@ -209,7 +224,7 @@ def add_umbrella_sampling_information():
         for index, sl in enumerate(tpr_lines[index:], start=index):
             if bool(re.search("vec \((\d+)\):", " ".join(sl))):
                 vec = []
-                for n in range(1, int(sl[1][1:-2])+1):
+                for n in range(1, int(sl[1][1:-2]) + 1):
                     vec.append(convert_str_to_int_float("".join(tpr_lines[index + n]).split("=")[1]))
                 break
         published_information["umbrella sampling"][f"pull-coord{i}-vec"] = vec
@@ -256,7 +271,7 @@ def add_awh_information():
                           keys=("awh-nbias",))
     store_values_for_keys(target=detailed_information,
                           keys=("awh-potential",
-                                "awh-share-multisim"))
+                                "awh-share-bias-multisim"))
     for awh_i in range(1, published_information["AWH adaptive biasing"]["awh-nbias"] + 1):
         store_values_for_keys(target=published_information["AWH adaptive biasing"],
                               keys=(f"awh{awh_i}-ndim",
@@ -331,8 +346,8 @@ def store_values_for_keys(target: dict,
 
 
 def store_first_values_for_keys_after_index(target: dict,
-                                           names_keys: tuple,
-                                           index: int):
+                                            names_keys: tuple,
+                                            index: int):
     for name, key in names_keys:
         for sl in tpr_lines[index:]:
             if sl[0] == key:
@@ -365,9 +380,22 @@ def add_additional_info():
     metadata["_created"] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
 
+def print_metadata(json, style):
+    if style == "json":
+        pprint(json)
+    elif style == "yaml":
+        print(yaml.dump(json,
+                        default_flow_style=False,
+                        indent=4,
+                        allow_unicode=True)
+              .replace("'", ""))
+
+
 if __name__ == "__main__":
     args = load_argumets()
     tpr_lines = load_tpr_lines(args.tpr_file)
+
+    #exit()
     main_information, tcoupl, pcoupl = extract_main_information(args)
     published_information = extract_published_information(tcoupl, pcoupl)
     detailed_information = extract_detailed_information()
@@ -383,3 +411,4 @@ if __name__ == "__main__":
                 "detailed_information": detailed_information}
 
     add_additional_info()
+    print_metadata(metadata, args.print_metadata)
