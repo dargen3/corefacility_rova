@@ -10,33 +10,47 @@ def load_argumets():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tpr_file',
                         type=str,
-                        help='Tpr file from gromacs with metadata.')
+                        help='Tpr file from gromacs with metadata. (Obligatory argument)')
     parser.add_argument('--gro_file',
                         type=str,
-                        help='Gro file from gromacs with metadata.')
+                        help='Gro file from gromacs with metadata. (Obligatory argument)')
     parser.add_argument('--cpt_file',
                         type=str,
-                        help='cpt file from gromacs with metadata.',
+                        help='Cpt file from gromacs with metadata.',
                         default=None)
     parser.add_argument('--print_metadata',
                         type=str,
                         choices=("json", "yaml"),
                         default="yaml",
                         help="Print extracted metadata as json or yaml.")
+    parser.add_argument('--delete_gromax_metadata_file',
+                        type=str,
+                        choices=("true", "false"),
+                        default="true",
+                        help="If false, the gromax metadata file is not deleted.")
+
     args = parser.parse_args()
+
+    if not args.tpr_file:
+        exit(f"\nERROR! Argument --tpr_file must be specified.\n")
+    if not args.gro_file:
+        exit(f"\nERROR! Argument --gro_file must be specified.\n")
 
     if not os.path.isfile(args.tpr_file):
         exit(f"\nERROR! There is no file {args.tpr_file}!\n")
     if not os.path.isfile(args.gro_file):
         exit(f"\nERROR! There is no file {args.gro_file}!\n")
-
+    if args.cpt_file:
+        if not os.path.isfile(args.cpt_file):
+            exit(f"\nERROR! There is no file {args.cpt_file}!\n")
     return args
 
 
 def load_tpr_lines(tpr_file: str) -> list:
-    os.system(f"gmx dump -s {tpr_file} 1> metadata_gmx.tmp")
+    os.system(f"gmx dump -s {tpr_file} 1> metadata_gmx.tmp 2> /dev/null")
     tpr_lines = [line.split() for line in open("metadata_gmx.tmp", "r").read().lower().splitlines()]
-    #os.system("rm metadata_gmx.tmp")
+    if args.delete_gromax_metadata_file == "true":
+        os.system("rm metadata_gmx.tmp")
     return tpr_lines
 
 
@@ -89,14 +103,13 @@ def extract_main_information(args) -> dict:
 
     main_information = {"force field": "probably has to be set by the user"}
 
-    os.system(f"gmx dump -s {args.tpr_file} 2>&1 | grep \"VERSION\" > version_gmx.tmp")
-    main_information["gromacs version"] = open("version_gmx.tmp", "r").read().splitlines()[0].split()[4]
+    os.system(f"gmx dump -s {args.tpr_file} 1> /dev/null 2> version_gmx.tmp")
+    main_information["gromacs version"] = [line for line in open("version_gmx.tmp", "r").readlines() if "VERSION" in line][0].split()[4]
     os.system("rm version_gmx.tmp")
-    os.system(f"gmx dump -s {args.tpr_file} 2>&1 > version_gmx.tmp")
     main_information["size and shape of the simulation box"] = [float(n) for n in
                                                                 open(args.gro_file, "r").readlines()[
                                                                     -1].rstrip().split()]
-    os.system("rm version_gmx.tmp")
+
     integrator = get_value_for_key("integrator")
     if integrator in ["steep", "cg"]:
         main_information["type of simulation"] = "energy minimization"
@@ -381,6 +394,7 @@ def add_additional_info():
 
 
 def print_metadata(json, style):
+    print("\n")
     if style == "json":
         pprint(json)
     elif style == "yaml":
