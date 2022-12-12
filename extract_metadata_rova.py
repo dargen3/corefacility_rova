@@ -13,11 +13,13 @@ def load_argumets():
                         help='Tpr file from gromacs with metadata. (Obligatory argument)')
     parser.add_argument('--gro_file',
                         type=str,
-                        help='Gro file from gromacs with metadata. (Obligatory argument)')
+                        help='Gro file from gromacs with metadata. (Obligatory argument)',
+                        required=True)
     parser.add_argument('--cpt_file',
                         type=str,
                         help='Cpt file from gromacs with metadata.',
-                        default=None)
+                        default=None,
+                        required=True)
     parser.add_argument('--print_metadata',
                         type=str,
                         choices=("json", "yaml"),
@@ -30,12 +32,6 @@ def load_argumets():
                         help="If false, the gromax metadata file is not deleted.")
 
     args = parser.parse_args()
-
-    if not args.tpr_file:
-        exit(f"\nERROR! Argument --tpr_file must be specified.\n")
-    if not args.gro_file:
-        exit(f"\nERROR! Argument --gro_file must be specified.\n")
-
     if not os.path.isfile(args.tpr_file):
         exit(f"\nERROR! There is no file {args.tpr_file}!\n")
     if not os.path.isfile(args.gro_file):
