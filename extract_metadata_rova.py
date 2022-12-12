@@ -10,7 +10,8 @@ def load_argumets():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tpr_file',
                         type=str,
-                        help='Tpr file from gromacs with metadata. (Obligatory argument)')
+                        help='Tpr file from gromacs with metadata. (Obligatory argument)',
+                        required=True)
     parser.add_argument('--gro_file',
                         type=str,
                         help='Gro file from gromacs with metadata. (Obligatory argument)',
@@ -18,8 +19,7 @@ def load_argumets():
     parser.add_argument('--cpt_file',
                         type=str,
                         help='Cpt file from gromacs with metadata.',
-                        default=None,
-                        required=True)
+                        default=None)
     parser.add_argument('--print_metadata',
                         type=str,
                         choices=("json", "yaml"),
