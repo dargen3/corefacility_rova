@@ -395,7 +395,7 @@ def print_metadata(json_string, style):
     if style == "json":
         pprint(json_string)
     elif style == "yaml":
-        print(yaml.dump(json,
+        print(yaml.dump(json_string,
                         default_flow_style=False,
                         indent=4,
                         allow_unicode=True)
