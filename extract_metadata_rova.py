@@ -6,6 +6,7 @@ import yaml
 import pprint
 
 
+
 def load_argumets():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tpr_file',
@@ -14,8 +15,7 @@ def load_argumets():
                         required=True)
     parser.add_argument('--gro_file',
                         type=str,
-                        help='Gro file from gromacs with metadata. (Obligatory argument)',
-                        required=True)
+                        help='Gro file from gromacs with metadata. (Obligatory argument)')
     parser.add_argument('--cpt_file',
                         type=str,
                         help='Cpt file from gromacs with metadata.',
@@ -389,10 +389,11 @@ def add_additional_info():
     metadata["_created"] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
 
-def print_metadata(json, style):
+def print_metadata(json_string, style):
     print("\n")
+    from pprint import pprint
     if style == "json":
-        pprint(json)
+        pprint(json_string)
     elif style == "yaml":
         print(yaml.dump(json,
                         default_flow_style=False,
